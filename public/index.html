@@ -1,0 +1,131 @@
+<!doctype html>
+<html>
+	<head>
+		<title>pictochat</title>
+		<style>
+			html {
+				background-color: gray;
+			}
+		</style>
+	</head>
+	
+	<body>
+		<h1>pictochat</h1>
+		
+		<canvas id="canvas">
+		</canvas>
+		
+		<form id="form" onsubmit="return false;">
+			<input type="button" value="Copy" onclick="canvas_copy();">
+			<input type="button" value="Delete" onclick="canvas_reset();">
+			<input type="submit" value="Send">
+		</form>
+		
+		<h1>history</h1>
+		<div id="history"></div>
+		
+		<script>
+			var canvas = document.getElementById("canvas");
+			var ctx = canvas.getContext("2d");
+			
+			var isDrawing = false;
+			var lastpoints = {
+				x: 0,
+				y: 0
+			};
+			
+			function init() {
+				canvas.width = 200;
+				canvas.height = 100;
+				canvas_reset();
+			}
+			
+			function canvas_reset() {
+				ctx.fillStyle = "white";
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+			}
+			
+			function canvas_copy() {
+				var last_image = messages_history.firstChild;
+				if (last_image)
+					ctx.drawImage(messages_history.firstChild, 0, 0);
+			}
+			
+			canvas.onmousemove = function(event) {
+				if (!isDrawing) {
+					return;
+				}
+				
+				ctx.lineTo(event.offsetX, event.offsetY);
+				ctx.stroke();
+				
+				ctx.beginPath();
+				ctx.moveTo(event.offsetX, event.offsetY);
+			};
+			
+			canvas.onmouseup = function(event) {
+				isDrawing = false;
+			};
+			
+			canvas.onmousedown = function(event) {
+				isDrawing = true;
+				
+				ctx.strokeStyle = "black";
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+				ctx.moveTo(event.offsetX, event.offsetY);
+			};
+			
+			function isCanvasBlank() {
+				var blank = document.createElement('canvas');
+				blank.width = canvas.width;
+				blank.height = canvas.height;
+				
+				blank.getContext("2d").fillStyle = "white";
+				blank.getContext("2d").fillRect(0, 0, blank.width, blank.height);
+
+				return canvas.toDataURL() == blank.toDataURL();
+			}
+			
+			function getCanvasImage() {
+				return canvas.toDataURL();;
+			}
+			
+			init();
+		</script>
+		
+		<script>
+			var messages_history = document.getElementById("history");
+			var socket = new WebSocket("ws://localhost:8080", "pictochat-protocol");
+			
+			socket.onopen = function(event) {
+				console.log("connected");
+			};
+			
+			socket.onmessage = function(event) {
+				var image = new Image();
+				image.src = event.data;
+				messages_history.insertBefore(image, messages_history.firstChild);
+			}
+			
+			
+			
+			document.getElementById("form").onsubmit = function(event) {
+				if (!socket) {
+					return false;
+				}
+				
+				if (isCanvasBlank()) {
+					return false;
+				}
+				
+				var image = getCanvasImage();
+				socket.send(image);
+				
+				console.log("send message");
+				canvas_reset();
+				return false;
+			};
+		</script>
+	</body>
+</html>
