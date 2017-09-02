@@ -1,0 +1,18 @@
+{
+  "name": "pictochat",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "monowii",
+  "license": "ISC",
+  "dependencies": {
+    "finalhandler": "^1.0.4",
+    "serve-static": "^1.12.4",
+    "websocket": "^1.0.24"
+  },
+  "devDependencies": {},
+  "description": ""
+}
