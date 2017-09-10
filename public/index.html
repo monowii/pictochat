@@ -19,23 +19,54 @@
 			#history p {
 				margin: 2px;
 			}
+			#rooms {
+				display: none;
+			}
+			#channels a, a:visited {
+				rooms: blue;
+			}
+			#chat {
+				display: none;
+			}
 		</style>
 	</head>
 	
 	<body>
 		<h1>pictochat</h1>
 		
-		<canvas id="canvas">
-		</canvas>
-		
-		<div id="controls">
-			<input type="button" value="Copy" onclick="canvas_copy();">
-			<input type="button" value="Delete" onclick="canvas_reset();">
-			<input type="button" value="Send" onclick="canvas_send();">
+		<div id="userinfos">
+			<input type="text" id="username" maxlength="16" placeholder="username">
+			<input type="button" value="Join" onclick="check_username();">
 		</div>
 		
-		<h1>history</h1>
-		<div id="history"></div>
+		<div id="rooms">
+			<ul>
+				<li><a href="#a" onclick="join_room('A');" id="room_a"></a></li>
+				<li><a href="#b" onclick="join_room('B');" id="room_b"></a></li>
+				<li><a href="#c" onclick="join_room('C');" id="room_c"></a></li>
+				<li><a href="#d" onclick="join_room('D');" id="room_d"></a></li>
+			</ul>
+		</div>
+		
+		<div id="chat">
+			<canvas id="canvas">
+			</canvas>
+			
+			<div id="controls">
+				<input type="button" value="Copy" onclick="canvas_copy();">
+				<input type="button" value="Delete" onclick="canvas_reset();">
+				<input type="button" value="Send" onclick="canvas_send();">
+			</div>
+			
+			<h1>history</h1>
+			<div id="history"></div>
+			
+			<h1>clients</h1>
+			<div id="client_list">
+				<ul>
+				</ul>
+			</div>
+		</div>
 		
 		<script>
 			var sounds_path_root = "sounds/";
@@ -134,7 +165,6 @@
 				
 				display_image(data.image);
 				
-				console.log("send message");
 				canvas_reset();
 			}
 			
@@ -182,47 +212,82 @@
 		</script>
 		
 		<script>
+			if (localStorage.getItem("username") != undefined)
+				document.getElementById("username").value = localStorage.getItem("username");
+		
+			var current_room;
+			var client_list = [];
+			
 			var messages_history = document.getElementById("history");
 			var socket = new WebSocket("ws://localhost:8080", "pictochat-protocol");
 			
 			socket.onopen = function(event) {
 				console.log("connection");
-				join_channel("test");
 			};
 			
 			socket.onmessage = function(message) {
-				console.log(message.data);
 				var data = JSON.parse(message.data);
 				
 				switch (data.event) {
-					case "auth success":
+					case "check username success":
+						console.log(data.rooms_info);
+						
+						document.getElementById("room_a").innerHTML = "Chat Room A ["+data.rooms_info.A+"/16]";
+						document.getElementById("room_b").innerHTML = "Chat Room B ["+data.rooms_info.B+"/16]";
+						document.getElementById("room_c").innerHTML = "Chat Room C ["+data.rooms_info.C+"/16]";
+						document.getElementById("room_d").innerHTML = "Chat Room D ["+data.rooms_info.D+"/16]";
+						
+						document.getElementById("userinfos").style.display = "none";
+						document.getElementById("rooms").style.display = "inline";
+						break;
+					case "room_connection success":
 						sound_play("join");
-						console.log(data.event);
+						
+						if (data.clients.length > 0)
+							client_list.push(data.clients);
+						
+						document.getElementById("rooms").style.display = "none";
+						document.getElementById("chat").style.display = "inline";
 						break;
-					case "auth failure":
-						sound_play("error");
-						console.log(data.event);
-						break;
-					
-					case "join":
-						diplay_message("Now entering: " + data.username);
+					case "client_join":
+						diplay_message("Now entering ["+current_room+"]: " + data.username);
 						sound_play("client_join");
+						client_list.push(data.username);
+						update_client_list();
 						break;
-					case "message":
+					case "client_message":
 						sound_play("client_message");
 						display_image(data.image);
-						console.log(data.event);
 						break;
-					case "leave":
+					case "client_leave":
 						diplay_message("Now leaving: " + data.username);
 						sound_play("client_leave");
+						client_list.splice(client_list.indexOf(data.username), 1);
+						update_client_list();
 						break;
 				}
 			}
 			
-			function join_channel(username) {
+			function check_username() {
+				var username = document.getElementById("username").value;
+				if (username.length == 0 || !username.trim()) {
+					return false;
+				}
+				
+				var check_username = {"event": "check_username", "username": username};
+				socket.send(JSON.stringify(check_username));
+				
+				localStorage.setItem("username", username);
+				
+				return true;
+			}
+			
+			function join_room(room) {
+				current_room = room;
+				var username = localStorage.getItem("username");
 				var data = {
 					"event": "join",
+					"room": room,
 					"username": username
 				};
 				socket.send(JSON.stringify(data));
@@ -241,6 +306,21 @@
 				image.src = imagedata;
 				
 				messages_history.insertBefore(image, messages_history.firstChild);
+			}
+			
+			function update_client_list() {
+				var ul = document.getElementById("client_list").getElementsByTagName("ul")[0];
+				
+				while (ul.firstChild) {
+					ul.removeChild(ul.firstChild);
+				}
+				
+				for (i in client_list) {
+					var element = document.createElement("li");
+					element.innerHTML = client_list[i];
+					
+					ul.appendChild(element);
+				}
 			}
 		</script>
 	</body>
