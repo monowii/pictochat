@@ -38,7 +38,7 @@ var max_connections_per_room = 16;
 var clients = [];
 
 function send_error(connection, event, message) {
-	var error = {"event": event, "message": message};
+	var error = {"event": event, "error": message};
 	connection.send(JSON.stringify(error));
 }
 
@@ -64,7 +64,7 @@ function get_rooms_info() {
 	return rooms_info;
 }
 
-function is_username_tooken(username) {
+function is_username_taken(username) {
 	for (var i in clients)
 		if (clients[i].username == username)
 			return true;
@@ -101,8 +101,7 @@ wsServer.on('request', function(request) {
 			return;
 		}
 		
-		var rooms = get_rooms_info();
-		var rooms_info = {"event": "rooms_info", "rooms": rooms};
+		var rooms_info = {"event": "rooms_info", "rooms_info": get_rooms_info()};
 		
 		connection.send(JSON.stringify(rooms_info));
 		
@@ -114,15 +113,29 @@ wsServer.on('request', function(request) {
 			
 			var data = JSON.parse(message.utf8Data);
 			
+			console.log(data.event);
+
 			switch (data.event) {
+				case "check_username":
+					if (is_username_taken(data.username)) {
+						send_error(connection, "check_username_failed", "username already taken")
+						console.log("dropped client (bad username) " + connection.remoteAddress);
+						return;
+					} else if (data.username === undefined || data.username.length === 0 || !data.username.trim()) {
+						send_error(connection, "check_username_failed", "incorrect username")
+						console.log("dropped client (incorrect username) " + connection.remoteAddress);
+						return;
+					} else {
+						var response = {"event": "check_username_success"};
+						connection.send(JSON.stringify(response));
+					}
+					break;
 				case "join":
-					if (data.username === undefined || data.username.length === 0 || !data.username.trim()) {
-						//connection.drop(WebSocketConnection.CLOSE_REASON_INVALID_DATA, "empty username");
-						send_error(connection, "room_connection_error", "empty username")
+					if (is_username_taken(data.username)) {
+						send_error(connection, "check_username", "username already taken")
 						console.log("dropped client (bad username) " + connection.remoteAddress);
 						return;
 					}
-					
 					if (data.room === undefined || ['A', 'B', 'C', 'D'].indexOf(data.room) == -1) {
 						//connection.drop(WebSocketConnection.CLOSE_REASON_INVALID_DATA, "incorrect room");
 						send_error(connection, "room_connection_error", "incorrect room");
@@ -134,13 +147,6 @@ wsServer.on('request', function(request) {
 						//connection.drop(WebSocketConnection.CLOSE_REASON_INVALID_DATA, "room full");
 						send_error(connection, "room_connection_error", "room full");
 						console.log("dropped client (room full) " + connection.remoteAddress);
-						return;
-					}
-					
-					if (is_username_tooken(data.username)) {
-						//connection.drop(WebSocketConnection.CLOSE_REASON_INVALID_DATA, "username already tooken");
-						send_error(connection, "room_connection_error", "username already tooken");
-						console.log("dropped client (username already tooken) " + connection.remoteAddress);
 						return;
 					}
 					
@@ -158,7 +164,7 @@ wsServer.on('request', function(request) {
 							if (destination.room == connection.room)
 								usernames_in_room.push(destination.username);
 					});
-					var data_success = {"event": "room_connection_success", "clients": usernames_in_room};
+					var data_success = {"event": "room_connection", "clients": usernames_in_room};
 					connection.send(JSON.stringify(data_success));
 					
 					var client_join = {"event": "client_join", "username": data.username};

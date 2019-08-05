@@ -227,20 +227,23 @@
 			
 			socket.onmessage = function(message) {
 				var data = JSON.parse(message.data);
-				
+
 				switch (data.event) {
-					case "check username success":
-						console.log(data.rooms_info);
-						
+					case "error":
+						console.log("error: ", error.data);
+						break;
+					case "rooms_info":
 						document.getElementById("room_a").innerHTML = "Chat Room A ["+data.rooms_info.A+"/16]";
 						document.getElementById("room_b").innerHTML = "Chat Room B ["+data.rooms_info.B+"/16]";
 						document.getElementById("room_c").innerHTML = "Chat Room C ["+data.rooms_info.C+"/16]";
 						document.getElementById("room_d").innerHTML = "Chat Room D ["+data.rooms_info.D+"/16]";
-						
+						break;
+					case "check_username_success":
+						console.log("check_username:", data);
 						document.getElementById("userinfos").style.display = "none";
 						document.getElementById("rooms").style.display = "inline";
 						break;
-					case "room_connection success":
+					case "room_connection":
 						sound_play("join");
 						
 						if (data.clients.length > 0)
